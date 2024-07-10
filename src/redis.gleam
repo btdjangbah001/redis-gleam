@@ -178,6 +178,5 @@ pub fn main() {
 fn clean_msg(msg: BitArray) -> String {
   bit_array.to_string(msg)
   |> result.unwrap("")
-  |> string.trim
 }
 
