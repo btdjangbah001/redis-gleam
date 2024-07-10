@@ -30,22 +30,22 @@ pub fn main() {
       let redisvalue = parser.decode(message)
       let _ = io.debug(redisvalue)
       case redisvalue.0 {
-        BulkString(Some(command)) -> {
-          case string.lowercase(command) {
-            "ping" -> {
-              let assert Ok(_) =
-                glisten.send(conn, bytes_builder.from_string(ping_response))
-                actor.continue(state)
-            }
-            _ -> {
-              let assert Ok(_) =
-                glisten.send(conn, bytes_builder.from_string(parser.encode(ErrorValue("-Err unknown command"), "")))
-                actor.continue(state) 
-            }
-          }
-        }
         Array(Some(list)) -> {
           case list.reverse(list) {
+            [BulkString(Some(command))] -> {
+              case string.lowercase(command) {
+                "ping" -> {
+                  let assert Ok(_) =
+                    glisten.send(conn, bytes_builder.from_string(ping_response))
+                    actor.continue(state)
+                }
+                _ -> {
+                  let assert Ok(_) =
+                    glisten.send(conn, bytes_builder.from_string(parser.encode(ErrorValue("-Err unknown command"), "")))
+                    actor.continue(state) 
+                }
+              }
+            }
             [BulkString(command_opt), BulkString(arg_opt)] -> {
               case command_opt, arg_opt {
                 Some(command), Some(arg) ->
