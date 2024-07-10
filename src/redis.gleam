@@ -1,169 +1,183 @@
-import gleam/int
-import gleam/option.{type Option, None, Some}
+import gleam/bit_array
+import gleam/bytes_builder
+import gleam/erlang/process
+import gleam/list
+import gleam/option.{None, Some}
+import gleam/otp/actor
+import gleam/result
 import gleam/string
+import glisten.{Packet}
+import parser.{Array, BulkString, ErrorValue}
+import cache.{type Cache}
 import gleam/io
 
-fn encode_bulk_string(input: String) -> String {
-  "$" <> int.to_string(string.length(input)) <> "\r\n" <> input <> "\r\n"
+const ping_response = "+PONG\r\n"
+ 
+fn init_store() -> Cache {
+  let assert Ok(cache) = cache.new()
+  cache
+  //read AOLF to reconstruct db in terms of restart
 }
 
-pub type RedisValue {
-  SimpleString(String)
-  BulkString(Option(String))
-  Integer(Int)
-  Array(Option(List(RedisValue)))
-  ErrorValue(String)
-}
+pub fn main() {
+  let store = init_store()
 
-type DecodeResult =
-  #(RedisValue, String)
-
-pub fn decode(input: String) -> DecodeResult {
-  case input {
-    "*" <> rest -> {
-      let int_decode_result = decode_integer(rest)
-      let redisvalue = int_decode_result.0
-      let size_option = case redisvalue {
-        Integer(num) -> Some(num)
-        _ -> None
-      }
-      case size_option {
-        Some(num) -> {
-          let input = int_decode_result.1
-          decode_array(input, num, Array(Some([])))
+  let assert Ok(_) =
+    glisten.handler(fn(_conn) { #(Nil, None) }, fn(msg, state, conn) {
+      let assert Packet(msg) = msg
+      let message = clean_msg(msg)
+      io.debug(message)
+      case string.lowercase(message) {
+        "ping" -> {
+          let assert Ok(_) =
+            glisten.send(conn, bytes_builder.from_string(ping_response))
+          actor.continue(state)
         }
-        None -> #(redisvalue, input)
-      }
-    }
-    "+" <> rest -> decode_simple_string(rest)
-    ":" <> rest -> decode_integer(rest)
-    "$" <> rest -> {
-      let int_decode_result = decode_integer(rest)
-      let redisvalue = int_decode_result.0
-      let size_option = case redisvalue {
-        Integer(num) -> Some(num)
-        _ -> None
-      }
-      case size_option {
-        Some(num) -> {
-          let input = int_decode_result.1
-          decode_bulk_string(input, num, BulkString(Some("")))
-        }
-        None -> #(redisvalue, input)
-      }
-    }
-    _ -> #(ErrorValue("Error parsing, we don't support this type yet!"), input)
-  }
-}
-
-fn decode_array(input: String, size: Int, acc: RedisValue) -> DecodeResult {
-  case size {
-    0 -> #(acc, input)
-    -1 -> #(Array(None), input)
-    _ -> {
-      let value = decode(input)
-      let acc = case acc {
-        Array(Some(list)) -> Array(Some([value.0, ..list]))
-        _ -> ErrorValue("Array acc souldn't be anything else")
-      }
-      decode_array(value.1, size - 1, acc)
-    }
-  }
-}
-
-fn decode_simple_string(input: String) -> DecodeResult {
-  let parts = string.split_once(input, "\r\n")
-
-  case parts {
-    Ok(p) -> {
-      let str = p.0
-      case skip_separator(p.1) {
-        Ok(inp) -> #(SimpleString(str), inp)
-        Error(_) -> #(ErrorValue("Protocol error. Expected delimeter when decoding simple string"), p.1)
-      }
-    }
-    Error(_) -> #(ErrorValue("Protocol error. Expected a string"), input)
-  }
-}
-
-fn decode_bulk_string(input: String, size: Int, acc: RedisValue) -> DecodeResult {
-  case size {
-    0 -> {
-      case skip_separator(input) {
-        Ok(inp) -> {
-          #(acc, inp)
-        }
-        Error(_) -> {
-          io.println(input)
-          #(ErrorValue("Protocol error. Expected delimeter when decoding bulk string"), input)
-        }
-      }
-    }
-    -1 -> #(BulkString(None), input)
-    _ -> {
-      let acc = case string.first(input) {
-        Ok(letter) ->
-          case acc {
-            BulkString(Some(data)) ->
-              BulkString(Some(string.append(data, letter)))
-            _ -> ErrorValue("Bulk string acc souldn't be anything else")
-          }
-        Error(_) -> ErrorValue("String length did not match")
-      }
-      decode_bulk_string(
-        string.slice(input, 1, string.length(input)),
-        size - 1,
-        acc,
-      )
-    }
-  }
-}
-
-fn decode_integer(inp: String) -> DecodeResult {
-  let parts = string.split_once(inp, "\r\n")
-
-  case parts {
-    Ok(p) -> {
-      case int.parse(p.0) {
-        Ok(num) -> {
-          let rest = string.append("\r\n", p.1)
-          case skip_separator(rest) {
-            Ok(inp) -> {
-              #(Integer(num), inp)
+        _ -> {
+          let redisvalue = parser.decode(message)
+          let _ = io.debug(redisvalue)
+          case redisvalue.0 {
+            Array(Some(list)) -> {
+              case list.reverse(list) {
+                [BulkString(command_opt), BulkString(arg_opt)] -> {
+                  case command_opt, arg_opt {
+                    Some(command), Some(arg) ->
+                      case string.lowercase(command) {
+                        "echo" -> {
+                          let assert Ok(_) =
+                            glisten.send(
+                              conn,
+                              bytes_builder.from_string(parser.encode(BulkString(arg_opt), "")),
+                            )
+                          actor.continue(state)
+                        }
+                        "get" -> {
+                          let value = cache.get(store, arg)
+                          case value {
+                            Ok(val) -> {
+                              let assert Ok(_) =
+                                glisten.send(
+                                  conn,
+                                  bytes_builder.from_string(parser.encode(val, "")), //must encode redis value now!
+                                )
+                              actor.continue(state)
+                            }
+                            Error(_) -> {
+                              let assert Ok(_) =
+                                glisten.send(
+                                  conn,
+                                  bytes_builder.from_string("(nil)"), //must encode redis value now!
+                                )
+                              actor.continue(state)
+                            } 
+                          }
+                        }
+                        _ -> {
+                          let assert Ok(_) =
+                            glisten.send(
+                              conn,
+                              bytes_builder.from_string(parser.encode(ErrorValue("ERR unknown command"), ""))
+                            )
+                          actor.continue(state)
+                        }
+                      }
+                    Some(command), None ->
+                      case string.lowercase(command) {
+                        "echo" -> {
+                          let assert Ok(_) =
+                            glisten.send(
+                              conn,
+                              bytes_builder.from_string(parser.encode(ErrorValue("ERR (nil) argument to " <> command), ""),
+                            ))
+                          actor.continue(state)
+                        }
+                        _ -> {
+                          let assert Ok(_) =
+                            glisten.send(
+                              conn,
+                              bytes_builder.from_string(parser.encode(ErrorValue("ERR unknown command " <> command), "")),
+                            )
+                          actor.continue(state)
+                        }
+                      }
+                    _, _ -> {
+                      let assert Ok(_) =
+                        glisten.send(
+                          conn,
+                          bytes_builder.from_string(parser.encode(ErrorValue("ERR unknown command"), "")),
+                        )
+                      actor.continue(state)
+                    }
+                  }
+                }
+                [BulkString(command_opt), BulkString(key_opt), BulkString(value_opt)] -> {
+                  case command_opt, key_opt, value_opt {
+                    Some(command), Some(key), Some(value) -> {
+                      case string.lowercase(command) {
+                        "set" -> {
+                          cache.set(store, key, BulkString(Some(value)))
+                          let assert Ok(_) =glisten.send(conn, bytes_builder.from_string(parser.encode(parser.SimpleString("OK"), ""),))
+                          actor.continue(state)
+                        }
+                        _ -> {
+                          let assert Ok(_) = glisten.send(
+                              conn,
+                              bytes_builder.from_string(parser.encode(ErrorValue("ERR unknown command " <> command), "")),
+                            )
+                          actor.continue(state)
+                        }
+                      }
+                    }
+                    None, _, _ -> {
+                      let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(ErrorValue("ERR command can't be (nil)"), "")),)
+                      actor.continue(state)
+                    }
+                    _, None, _ -> {
+                      let assert Ok(_) = glisten.send(conn, 
+                      bytes_builder.from_string(parser.encode(ErrorValue("ERR unknown command"), "")),
+                      )
+                      actor.continue(state)
+                    }
+                    _, _, None -> {
+                      let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(ErrorValue("ERR unknown command"), "")),)
+                      actor.continue(state)
+                    }
+                  }
+                }
+                _ -> {
+                  let assert Ok(_) =
+                    glisten.send(
+                      conn,
+                      bytes_builder.from_string(
+                        "We matched more than 2 items in list",
+                      ),
+                    )
+                  actor.continue(state)
+                }
+              }
             }
-            Error(_) -> #(ErrorValue("Protocol error. Expected delimeter when decoding integer"), p.1)
+            ErrorValue(text) -> {
+              let assert Ok(_) =
+                glisten.send(conn, bytes_builder.from_string(text))
+              actor.continue(state)
+            }
+            _ -> {
+              let assert Ok(_) =
+                glisten.send(conn, bytes_builder.from_string("Nothing worked"))
+              actor.continue(state)
+            }
           }
         }
-        Error(_) -> #(ErrorValue("Expected a number\r\n"), inp)
       }
-    }
-    Error(_) -> #(ErrorValue("Protocol error\r\n"), inp)
-  }
+    })
+    |> glisten.serve(6379)
+
+  process.sleep_forever()
 }
 
-fn skip_separator(input: String) -> Result(String, Nil) {
-  case input {
-    "\r\n" <> rest -> Ok(rest)
-    _ -> Error(Nil)
-  }
+fn clean_msg(msg: BitArray) -> String {
+  bit_array.to_string(msg)
+  |> result.unwrap("")
+  |> string.trim
 }
 
-pub fn encode(value: RedisValue, acc: String) -> String {
-  case value {
-    SimpleString(value) -> string.append(acc, ":" <> value <> "\r\n")
-    BulkString(Some(value)) -> string.append(acc, encode_bulk_string(value))
-    BulkString(None) -> string.append(acc, "$-1\r\n")
-    Integer(value) -> string.append(acc, ":" <> int.to_string(value) <> "\r\n")
-    Array(Some(value)) -> {
-      case value {
-        [] -> acc
-        [head, ..tail] -> {
-          let acc = encode(head, acc)
-          encode(Array(Some(tail)), acc)
-        }
-      }
-    }
-    Array(None) -> string.append(acc, "*-1\r\n")
-    ErrorValue(error) -> "-ERR " <> error
-  }
-}
