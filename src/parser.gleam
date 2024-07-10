@@ -150,7 +150,7 @@ fn skip_separator(input: String) -> Result(String, Nil) {
 
 pub fn encode(value: RedisValue, acc: String) -> String {
   case value {
-    SimpleString(value) -> string.append(acc, ":" <> value <> "\r\n")
+    SimpleString(value) -> string.append(acc, "+" <> value <> "\r\n")
     BulkString(Some(value)) -> string.append(acc, encode_bulk_string(value))
     BulkString(None) -> string.append(acc, "$-1\r\n")
     Integer(value) -> string.append(acc, ":" <> int.to_string(value) <> "\r\n")
