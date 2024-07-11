@@ -1,7 +1,6 @@
 import gleam/int
 import gleam/option.{type Option, None, Some}
 import gleam/string
-import gleam/io
 
 fn encode_bulk_string(input: String) -> String {
   "$" <> int.to_string(string.length(input)) <> "\r\n" <> input <> "\r\n"
@@ -52,7 +51,7 @@ pub fn decode(input: String) -> DecodeResult {
         None -> #(redisvalue, input)
       }
     }
-    _ -> #(ErrorValue("Error parsing, we don't support this type yet!"), input)
+    _ -> #(ErrorValue("Protocol Error. We dont support this type yet"), input)
   }
 }
 
@@ -94,7 +93,6 @@ fn decode_bulk_string(input: String, size: Int, acc: RedisValue) -> DecodeResult
           #(acc, inp)
         }
         Error(_) -> {
-          io.println(input)
           #(ErrorValue("Protocol error. Expected delimeter when decoding bulk string"), input)
         }
       }
@@ -164,6 +162,6 @@ pub fn encode(value: RedisValue, acc: String) -> String {
       }
     }
     Array(None) -> string.append(acc, "*-1\r\n")
-    ErrorValue(error) -> "-ERR " <> error
+    ErrorValue(error) -> "-ERR " <> error <> "\r\n"
   }
 }

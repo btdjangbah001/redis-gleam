@@ -1,16 +1,15 @@
 import gleam/dict.{type Dict}
 import gleam/erlang/process.{type Subject}
 import gleam/otp/actor
-import parser.{type RedisValue}
 
 const timeout = 3000
 
 pub type Store =
-  Dict(String, RedisValue)
+  Dict(String, String)
 
 pub type Message {
-  Get(Subject(Result(RedisValue, Nil)), String)
-  Set(String, RedisValue)
+  Get(Subject(Result(String, Nil)), String)
+  Set(String, String)
   Delete(String)
 }
 
@@ -38,11 +37,11 @@ pub fn new() -> Result(Cache, actor.StartError) {
   actor.start(dict.new(), handle_commands)
 }
 
-pub fn set(cache: Cache, key: String, value: RedisValue) -> Nil {
+pub fn set(cache: Cache, key: String, value: String) -> Nil {
   process.send(cache, Set(key, value))
 }
 
-pub fn get(cache: Cache, key: String) -> Result(RedisValue, Nil) {
+pub fn get(cache: Cache, key: String) -> Result(String, Nil) {
   actor.call(cache, Get(_, key), timeout) //process.try_call maybe?
 }
 
