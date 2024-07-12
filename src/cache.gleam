@@ -3,6 +3,7 @@ import gleam/erlang/process.{type Subject}
 import gleam/otp/actor
 import birl
 import gleam/io
+import gleam/int
 
 const timeout = 3000
 
@@ -32,7 +33,7 @@ fn handle_commands(message: Message, store: Store) -> actor.Next(Message, Store)
             -1 -> Ok(value.0)
             _ -> {
               let current_ts = birl.to_unix(birl.utc_now()) * 1000
-              io.debug(current_ts)
+              io.debug("Accessing time is: " <> int.to_string(current_ts))
               io.debug(value)
               case current_ts < value.1 {
                 True -> Ok(value.0)

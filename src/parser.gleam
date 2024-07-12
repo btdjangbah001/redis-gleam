@@ -17,7 +17,11 @@ pub type RedisValue {
 type DecodeResult =
   #(RedisValue, String)
 
-pub fn decode(input: String) -> DecodeResult {
+pub fn decode(input: String){
+  decode_acc(input)
+}
+
+pub fn decode_acc(input: String) -> DecodeResult {
   case input {
     "*" <> rest -> {
       let int_decode_result = decode_integer(rest)
@@ -60,7 +64,7 @@ fn decode_array(input: String, size: Int, acc: RedisValue) -> DecodeResult {
     0 -> #(acc, input)
     -1 -> #(Array(None), input)
     _ -> {
-      let value = decode(input)
+      let value = decode_acc(input)
       let acc = case acc {
         Array(Some(list)) -> Array(Some([value.0, ..list]))
         _ -> ErrorValue("Array acc souldn't be anything else")
@@ -146,7 +150,11 @@ fn skip_separator(input: String) -> Result(String, Nil) {
   }
 }
 
-pub fn encode(value: RedisValue, acc: String) -> String {
+pub fn encode(value: RedisValue) {
+  encode_acc(value, "")
+}
+
+fn encode_acc(value: RedisValue, acc: String) -> String {
   case value {
     SimpleString(value) -> string.append(acc, "+" <> value <> "\r\n")
     BulkString(Some(value)) -> string.append(acc, encode_bulk_string(value))
@@ -156,8 +164,8 @@ pub fn encode(value: RedisValue, acc: String) -> String {
       case value {
         [] -> acc
         [head, ..tail] -> {
-          let acc = encode(head, acc)
-          encode(Array(Some(tail)), acc)
+          let acc = encode_acc(head, acc)
+          encode_acc(Array(Some(tail)), acc)
         }
       }
     }

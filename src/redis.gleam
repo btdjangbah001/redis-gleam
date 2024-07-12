@@ -36,26 +36,17 @@ pub fn main() {
                     "echo" -> handlers.handle_echo(conn, state, args)
                     "set" -> handlers.handle_set(conn, state, args, store)
                     "get" -> handlers.handle_get(conn, state, args, store)
-                    _ -> {
-                      let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(ErrorValue("ERR unknown command '" <> command <> "'"), "")))
-                      actor.continue(state)
-                    }
+                    _ -> handlers.handle_simple_error(conn, state, "unknown command '" <> command <> "'")
                   }
                 }
                 _ -> {
-                  let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(ErrorValue("ERR commands should be encoded as bulk strings"), "")))
+                  handlers.handle_simple_error(conn, state, "unknown command")
                       actor.continue(state)
                 }
               }
             }
-            ErrorValue(text) -> {
-              let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(ErrorValue(text), "")))
-              actor.continue(state)
-            }
-            _ -> {
-              let assert Ok(_) = glisten.send(conn, bytes_builder.from_string("Nothing worked"))
-              actor.continue(state)
-            }
+            ErrorValue(text) -> handlers.handle_simple_error(conn, state, text)
+            _ -> handlers.handle_simple_error(conn, state, "commands must be encoded as an array with first item a bulk string")
           }
         }
       }
