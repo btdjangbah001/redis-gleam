@@ -4,6 +4,10 @@ import gleam/otp/actor
 import gleam/option.{None, Some}
 import cache.{type Cache}
 import parser.{type RedisValue, SimpleString, BulkString, ErrorValue}
+import gleam/string
+import gleam/int
+import birl
+import birl/duration
 
 pub fn handle_ping(conn: glisten.Connection(a), state: Nil){
     let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(SimpleString("PONG"), "")))
@@ -20,10 +24,7 @@ pub fn handle_echo(conn: glisten.Connection(a), state: Nil, args: List(RedisValu
             let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(BulkString(None), "")))
             actor.continue(state)
         }
-        _ -> {
-            let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(ErrorValue("ERR incorrect number of arguments for 'echo' command"), "")))
-            actor.continue(state)
-        }
+        _ -> handle_simple_error(conn, state, "incorrect number of arguments for 'echo' command")
     } 
 }
 
@@ -56,17 +57,39 @@ pub fn handle_get(conn: glisten.Connection(a), state: Nil, args: List(RedisValue
 pub fn handle_set(conn: glisten.Connection(a), state: Nil, args: List(RedisValue), store: Cache){
     case args {
         [BulkString(Some(key)), value] -> {
-            cache.set(store, key, parser.encode(value, ""))
+            set_to_cache(store, key, parser.encode(value, ""), -1)
             let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(parser.SimpleString("OK"), ""),))
             actor.continue(state)
         }
-        [BulkString(None), _] -> {
-            let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(ErrorValue("ERR key for 'set' command cannot be null"), "")))
-            actor.continue(state)
+        [BulkString(Some(key)), value, BulkString(Some(px)), BulkString(Some(expiry))] -> {
+            case string.lowercase(px), int.parse(expiry) {
+                "px", Ok(expiry) -> {
+                    case expiry > 0 {
+                        True -> {
+                            let now = birl.utc_now()
+                            let duration = duration.milli_seconds(expiry)
+                            let expiry_time = birl.to_unix(birl.add(now, duration)) * 1000
+                            set_to_cache(store, key, parser.encode(value, ""), expiry_time)
+                            let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(parser.SimpleString("OK"), ""),))
+                            actor.continue(state)
+                        }
+                        False -> handle_simple_error(conn, state, "expiry cannot be a negative number. Found '" <> int.to_string(expiry) <> "'")
+                    }
+                }
+                "px", Error(_) -> handle_simple_error(conn, state, "px command nedds a number encoded as bulk string as argument. Found '" <> expiry <> "'")
+                _, _-> handle_simple_error(conn, state, "expected third arg to 'set' command to be 'px' but found '" <> px <> "'")
+            }     
         }
-        _ -> {
-            let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(ErrorValue("ERR incorrect number of arguments for 'set' command"), "")))
-            actor.continue(state)
-        }
+        [BulkString(None), _] -> handle_simple_error(conn, state, "key for 'set' command cannot be null")
+        _ -> handle_simple_error(conn, state, "incorrect number of arguments for 'set' command")
     } 
+}
+
+pub fn handle_simple_error(conn: glisten.Connection(a), state: Nil, message: String) {
+    let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(ErrorValue(message), "")))
+    actor.continue(state) 
+}
+
+fn set_to_cache(store: Cache, key: String, value: String, expiry: Int){
+    cache.set(store, key, value, expiry)
 }
