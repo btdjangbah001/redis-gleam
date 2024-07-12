@@ -66,9 +66,8 @@ pub fn handle_set(conn: glisten.Connection(a), state: Nil, args: List(RedisValue
                 "px", Ok(expiry) -> {
                     case expiry > 0 {
                         True -> {
-                            let now = birl.utc_now()
-                            let duration = duration.milli_seconds(expiry)
-                            let expiry_time = birl.to_unix(birl.add(now, duration)) * 1000
+                            let now = birl.to_unix(birl.utc_now()) * 1000
+                            let expiry_time = now + expiry 
                             set_to_cache(store, key, parser.encode(value, ""), expiry_time)
                             let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(parser.SimpleString("OK"), ""),))
                             actor.continue(state)
