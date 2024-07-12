@@ -66,7 +66,7 @@ pub fn handle_set(conn: glisten.Connection(a), state: Nil, args: List(RedisValue
                 "px", Ok(expiry) -> {
                     case expiry > 0 {
                         True -> {
-                            let now = birl.to_unix(birl.utc_now()) * 1000
+                            let now = birl.to_unix_milli(birl.utc_now())
                             let expiry_time = now + expiry 
                             set_to_cache(store, key, parser.encode(value), expiry_time)
                             io.debug("Expiry time is: " <> int.to_string(expiry_time))

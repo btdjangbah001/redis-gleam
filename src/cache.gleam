@@ -32,7 +32,7 @@ fn handle_commands(message: Message, store: Store) -> actor.Next(Message, Store)
           case value.1 {
             -1 -> Ok(value.0)
             _ -> {
-              let current_ts = birl.to_unix(birl.utc_now()) * 1000
+              let current_ts = birl.to_unix_milli(birl.utc_now())
               io.debug("Accessing time is: " <> int.to_string(current_ts))
               io.debug(value)
               case current_ts < value.1 {

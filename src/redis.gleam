@@ -1,5 +1,4 @@
 import gleam/bit_array
-import gleam/bytes_builder
 import gleam/erlang/process
 import gleam/list
 import gleam/option.{None, Some}
