@@ -1,3 +1,4 @@
+import gleam/int
 import gleam/bit_array
 import gleam/erlang/process
 import gleam/list
@@ -9,6 +10,7 @@ import glisten.{Packet}
 import parser.{Array, BulkString, SimpleError}
 import cache.{type Cache}
 import handlers
+import argv
 
 fn init_store() -> Cache {
   let assert Ok(cache) = cache.new()
@@ -16,6 +18,10 @@ fn init_store() -> Cache {
 }
 
 pub fn main() {
+  let port = case argv.load().arguments {
+   ["--port", port] -> result.unwrap(int.parse(port), 6379)
+   _ -> 6379
+  }
   let store = init_store()
 
   let assert Ok(_) =
@@ -50,7 +56,7 @@ pub fn main() {
         }
       }
     })
-    |> glisten.serve(6379)
+    |> glisten.serve(port)
 
   process.sleep_forever()
 }
