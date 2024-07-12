@@ -3,7 +3,7 @@ import gleam/bytes_builder
 import gleam/otp/actor
 import gleam/option.{None, Some}
 import cache.{type Cache}
-import parser.{type RedisValue, SimpleString, BulkString, ErrorValue}
+import parser.{type RedisValue, SimpleString, BulkString, SimpleError}
 import gleam/string
 import gleam/int
 import birl
@@ -43,14 +43,8 @@ pub fn handle_get(conn: glisten.Connection(a), state: Nil, args: List(RedisValue
                 } 
             }
         }
-        [BulkString(None)] -> {
-            let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(ErrorValue("ERR key for 'get' command cannot be null"))))
-            actor.continue(state)
-        }
-        _ -> {
-            let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(ErrorValue("ERR incorrect number of arguments for 'get' command"))))
-            actor.continue(state)
-        }
+        [BulkString(None)] -> handle_simple_error(conn, state, "key for 'get' command cannot be null")
+        _ -> handle_simple_error(conn, state, "incorrect number of arguments for 'get' command")
     } 
 }
 
@@ -86,7 +80,7 @@ pub fn handle_set(conn: glisten.Connection(a), state: Nil, args: List(RedisValue
 }
 
 pub fn handle_simple_error(conn: glisten.Connection(a), state: Nil, message: String) {
-    let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(ErrorValue(message))))
+    let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(SimpleError(message))))
     actor.continue(state) 
 }
 

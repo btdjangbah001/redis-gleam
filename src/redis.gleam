@@ -6,7 +6,7 @@ import gleam/otp/actor
 import gleam/result
 import gleam/string
 import glisten.{Packet}
-import parser.{Array, BulkString, ErrorValue}
+import parser.{Array, BulkString, SimpleError}
 import cache.{type Cache}
 import handlers
 
@@ -26,7 +26,7 @@ pub fn main() {
         "ping" -> handlers.handle_ping(conn, state)
         _ -> {
           let redisvalue = parser.decode(message)
-          case redisvalue.0 {
+          case redisvalue {
             Array(Some(list)) -> {
               case list.reverse(list) {
                 [BulkString(Some(command)), ..args] -> {
@@ -44,7 +44,7 @@ pub fn main() {
                 }
               }
             }
-            ErrorValue(text) -> handlers.handle_simple_error(conn, state, text)
+            SimpleError(text) -> handlers.handle_simple_error(conn, state, text)
             _ -> handlers.handle_simple_error(conn, state, "commands must be encoded as an array with first item a bulk string")
           }
         }
