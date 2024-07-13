@@ -1,9 +1,7 @@
+import birl
 import gleam/dict.{type Dict}
 import gleam/erlang/process.{type Subject}
 import gleam/otp/actor
-import birl
-import gleam/io
-import gleam/int
 
 const timeout = 3000
 
@@ -27,25 +25,33 @@ fn handle_commands(message: Message, store: Store) -> actor.Next(Message, Store)
     }
     Get(client, key) -> {
       let value = dict.get(store, key)
-      let value = case value {
+      case value {
         Ok(value) -> {
           case value.1 {
-            -1 -> Ok(value.0)
+            -1 -> {
+              process.send(client, Ok(value.0))
+              actor.continue(store)
+            }
             _ -> {
               let current_ts = birl.to_unix_milli(birl.utc_now())
-              io.debug("Accessing time is: " <> int.to_string(current_ts))
-              io.debug(value)
               case current_ts < value.1 {
-                True -> Ok(value.0)
-                False -> Error(Nil)
+                True -> {
+                  process.send(client, Ok(value.0))
+                  actor.continue(store)
+                }
+                False -> {
+                  process.send(client, Error(Nil))
+                  actor.continue(dict.delete(store, key))
+                }
               }
             }
           }
         }
-        Error(_) -> Error(Nil)
+        Error(_) -> {
+          process.send(client, Error(Nil))
+          actor.continue(store)
+        }
       }
-      process.send(client, value)
-      actor.continue(store)
     }
     Delete(key) -> {
       let store = dict.delete(store, key)
@@ -63,7 +69,8 @@ pub fn set(cache: Cache, key: String, value: String, expiry: Int) -> Nil {
 }
 
 pub fn get(cache: Cache, key: String) -> Result(String, Nil) {
-  actor.call(cache, Get(_, key), timeout) //process.try_call maybe?
+  actor.call(cache, Get(_, key), timeout)
+  //process.try_call maybe?
 }
 
 pub fn delete(cache: Cache, key: String) -> Nil {

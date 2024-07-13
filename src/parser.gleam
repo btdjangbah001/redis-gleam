@@ -1,10 +1,10 @@
-import gleam/set
-import gleam/int
-import gleam/float
-import gleam/option.{type Option, None, Some}
-import gleam/string
-import gleam/list
 import gleam/dict.{type Dict}
+import gleam/float
+import gleam/int
+import gleam/list
+import gleam/option.{type Option, None, Some}
+import gleam/set
+import gleam/string
 
 pub type RedisValue {
   SimpleString(String)
@@ -27,7 +27,8 @@ type DecodeResult =
   #(RedisValue, String)
 
 pub fn decode(input: String) -> RedisValue {
-  decode_acc(input).0 //extra logic to check for input not done should be here i guess
+  decode_acc(input).0
+  //extra logic to check for input not done should be here i guess
 }
 
 pub fn decode_acc(input: String) -> DecodeResult {
@@ -67,7 +68,10 @@ pub fn decode_acc(input: String) -> DecodeResult {
     "_" <> rest -> {
       case skip_separator(rest) {
         Ok(inp) -> #(Null, inp)
-        Error(_) -> #(SimpleError("Protocol error. Expected delimeter when decoding null"), rest)
+        Error(_) -> #(
+          SimpleError("Protocol error. Expected delimeter when decoding null"),
+          rest,
+        )
       }
     }
     "#" <> rest -> {
@@ -77,10 +81,20 @@ pub fn decode_acc(input: String) -> DecodeResult {
           case f {
             "t" -> #(Boolean(True), string.slice(rest, 1, string.length(rest)))
             "f" -> #(Boolean(False), string.slice(rest, 1, string.length(rest)))
-            letter -> #(SimpleError("Protocol error. Expect boolean to be either 't' or 'f' but found '" <> letter <> "'"), rest)
+            letter -> #(
+              SimpleError(
+                "Protocol error. Expect boolean to be either 't' or 'f' but found '"
+                <> letter
+                <> "'",
+              ),
+              rest,
+            )
           }
-        } 
-        Error(_) -> #(SimpleError("Expected 't' or 'f' after # but was empty"), rest)
+        }
+        Error(_) -> #(
+          SimpleError("Expected 't' or 'f' after # but was empty"),
+          rest,
+        )
       }
     }
     "," <> rest -> decode_float(rest)
@@ -129,7 +143,6 @@ pub fn decode_acc(input: String) -> DecodeResult {
         }
         None -> #(redisvalue, input)
       }
-
     }
     ">" <> rest -> {
       let int_decode_result = decode_integer(rest)
@@ -144,7 +157,7 @@ pub fn decode_acc(input: String) -> DecodeResult {
           decode_push(input, num, Push(Some([])))
         }
         None -> #(redisvalue, input)
-      } 
+      }
     }
     _ -> #(SimpleError("Protocol Error. We dont support this type yet"), input)
   }
@@ -158,7 +171,10 @@ fn decode_array(input: String, size: Int, acc: RedisValue) -> DecodeResult {
       let value = decode_acc(input)
       let acc = case acc {
         Array(Some(list)) -> Array(Some([value.0, ..list]))
-        value -> panic as {"array accumulator was not a Array(Some) but got " <> encode(value)}
+        value ->
+          panic as {
+            "array accumulator was not a Array(Some) but got " <> encode(value)
+          }
       }
       decode_array(value.1, size - 1, acc)
     }
@@ -173,7 +189,10 @@ fn decode_push(input: String, size: Int, acc: RedisValue) -> DecodeResult {
       let value = decode_acc(input)
       let acc = case acc {
         Push(Some(list)) -> Push(Some([value.0, ..list]))
-        value -> panic as {"push accumulator was not a Push(Some) but got " <> encode(value)}
+        value ->
+          panic as {
+            "push accumulator was not a Push(Some) but got " <> encode(value)
+          }
       }
       decode_push(value.1, size - 1, acc)
     }
@@ -188,7 +207,10 @@ fn decode_set(input: String, size: Int, acc: RedisValue) -> DecodeResult {
       let value = decode_acc(input)
       let acc = case acc {
         Set(Some(set)) -> Set(Some(set.insert(set, value.0)))
-        value -> panic as {"set accumulator was not a Set(Some) but got " <> encode(value)}
+        value ->
+          panic as {
+            "set accumulator was not a Set(Some) but got " <> encode(value)
+          }
       }
       decode_set(value.1, size - 1, acc)
     }
@@ -203,7 +225,12 @@ fn decode_simple_string(input: String) -> DecodeResult {
       let str = p.0
       case skip_separator(p.1) {
         Ok(inp) -> #(SimpleString(str), inp)
-        Error(_) -> #(SimpleError("Protocol error. Expected delimeter when decoding simple string"), p.1)
+        Error(_) -> #(
+          SimpleError(
+            "Protocol error. Expected delimeter when decoding simple string",
+          ),
+          p.1,
+        )
       }
     }
     Error(_) -> #(SimpleError("Protocol error. Expected a string"), input)
@@ -218,7 +245,12 @@ fn decode_bulk_string(input: String, size: Int, acc: RedisValue) -> DecodeResult
           #(acc, inp)
         }
         Error(_) -> {
-          #(SimpleError("Protocol error. Expected delimeter when decoding bulk string"), input)
+          #(
+            SimpleError(
+              "Protocol error. Expected delimeter when decoding bulk string",
+            ),
+            input,
+          )
         }
       }
     }
@@ -227,8 +259,13 @@ fn decode_bulk_string(input: String, size: Int, acc: RedisValue) -> DecodeResult
       let acc = case string.first(input) {
         Ok(letter) ->
           case acc {
-            BulkString(Some(data)) -> BulkString(Some(string.append(data, letter)))
-            value -> panic as {"bulk string accumulator was not a BulkString(Some) but got " <> encode(value)}
+            BulkString(Some(data)) ->
+              BulkString(Some(string.append(data, letter)))
+            value ->
+              panic as {
+                "bulk string accumulator was not a BulkString(Some) but got "
+                <> encode(value)
+              }
           }
         Error(_) -> SimpleError("String length did not match")
       }
@@ -241,7 +278,11 @@ fn decode_bulk_string(input: String, size: Int, acc: RedisValue) -> DecodeResult
   }
 }
 
-fn decode_verbatim_string(input: String, size: Int, acc: RedisValue) -> DecodeResult {
+fn decode_verbatim_string(
+  input: String,
+  size: Int,
+  acc: RedisValue,
+) -> DecodeResult {
   case size {
     0 -> {
       case skip_separator(input) {
@@ -249,7 +290,12 @@ fn decode_verbatim_string(input: String, size: Int, acc: RedisValue) -> DecodeRe
           #(acc, inp)
         }
         Error(_) -> {
-          #(SimpleError("Protocol error. Expected delimeter when decoding bulk string"), input)
+          #(
+            SimpleError(
+              "Protocol error. Expected delimeter when decoding bulk string",
+            ),
+            input,
+          )
         }
       }
     }
@@ -258,8 +304,13 @@ fn decode_verbatim_string(input: String, size: Int, acc: RedisValue) -> DecodeRe
       let acc = case string.first(input) {
         Ok(letter) ->
           case acc {
-            VerbatimString(Some(data)) -> VerbatimString(Some(string.append(data, letter)))
-            value -> panic as {"verbatim accumulator was not a VerbatimString(Some) but got " <> encode(value)}
+            VerbatimString(Some(data)) ->
+              VerbatimString(Some(string.append(data, letter)))
+            value ->
+              panic as {
+                "verbatim accumulator was not a VerbatimString(Some) but got "
+                <> encode(value)
+              }
           }
         Error(_) -> SimpleError("String length did not match")
       }
@@ -280,7 +331,12 @@ fn decode_bulk_errors(input: String, size: Int, acc: RedisValue) -> DecodeResult
           #(acc, inp)
         }
         Error(_) -> {
-          #(SimpleError("Protocol error. Expected delimeter when decoding bulk string"), input)
+          #(
+            SimpleError(
+              "Protocol error. Expected delimeter when decoding bulk string",
+            ),
+            input,
+          )
         }
       }
     }
@@ -289,8 +345,13 @@ fn decode_bulk_errors(input: String, size: Int, acc: RedisValue) -> DecodeResult
       let acc = case string.first(input) {
         Ok(letter) ->
           case acc {
-            BulkError(Some(data)) -> BulkError(Some(string.append(data, letter)))
-            value -> panic as {"bulk error accumulator was not a BulkError(Some) but got " <> encode(value)}
+            BulkError(Some(data)) ->
+              BulkError(Some(string.append(data, letter)))
+            value ->
+              panic as {
+                "bulk error accumulator was not a BulkError(Some) but got "
+                <> encode(value)
+              }
           }
         Error(_) -> SimpleError("String length did not match")
       }
@@ -315,7 +376,12 @@ fn decode_integer(inp: String) -> DecodeResult {
             Ok(inp) -> {
               #(Integer(num), inp)
             }
-            Error(_) -> #(SimpleError("Protocol error. Expected delimeter when decoding integer"), p.1)
+            Error(_) -> #(
+              SimpleError(
+                "Protocol error. Expected delimeter when decoding integer",
+              ),
+              p.1,
+            )
           }
         }
         Error(_) -> #(SimpleError("Expected a number\r\n"), inp)
@@ -337,7 +403,12 @@ fn decode_big_number(inp: String) -> DecodeResult {
             Ok(inp) -> {
               #(BigNumber(num), inp)
             }
-            Error(_) -> #(SimpleError("Protocol error. Expected delimeter when decoding integer"), p.1)
+            Error(_) -> #(
+              SimpleError(
+                "Protocol error. Expected delimeter when decoding integer",
+              ),
+              p.1,
+            )
           }
         }
         Error(_) -> #(SimpleError("Expected a number\r\n"), inp)
@@ -359,7 +430,12 @@ fn decode_float(inp: String) -> DecodeResult {
             Ok(inp) -> {
               #(Double(num), inp)
             }
-            Error(_) -> #(SimpleError("Protocol error. Expected delimeter when decoding integer"), p.1)
+            Error(_) -> #(
+              SimpleError(
+                "Protocol error. Expected delimeter when decoding integer",
+              ),
+              p.1,
+            )
           }
         }
         Error(_) -> #(SimpleError("Expected a number\r\n"), inp)
@@ -379,7 +455,9 @@ fn decode_map(input: String, size: Int, acc: RedisValue) -> DecodeResult {
       let acc = case acc {
         Map(Some(map)) -> Map(Some(dict.insert(map, key.0, value.0)))
         value -> {
-          panic as {"map accumulator was not a Map(Some) but got " <> encode(value)}
+          panic as {
+            "map accumulator was not a Map(Some) but got " <> encode(value)
+          }
         }
       }
       decode_map(value.1, size - 1, acc)
@@ -420,7 +498,11 @@ pub fn encode(value: RedisValue) {
 fn encode_acc(value: RedisValue, acc: String) -> String {
   case value {
     SimpleString(value) -> string.append(acc, "+" <> value <> "\r\n")
-    BulkString(Some(value)) -> string.append(acc, "$" <> int.to_string(string.length(value)) <> "\r\n" <> value <> "\r\n")
+    BulkString(Some(value)) ->
+      string.append(
+        acc,
+        "$" <> int.to_string(string.length(value)) <> "\r\n" <> value <> "\r\n",
+      )
     BulkString(None) -> string.append(acc, "$-1\r\n")
     Integer(value) -> string.append(acc, ":" <> int.to_string(value) <> "\r\n")
     Array(Some(value)) -> {
@@ -436,16 +518,26 @@ fn encode_acc(value: RedisValue, acc: String) -> String {
     SimpleError(error) -> "-ERR " <> error <> "\r\n"
     Null -> acc <> "_\r\n"
     Boolean(flag) -> {
-      acc <> case flag {
+      acc
+      <> case flag {
         True -> "#t\r\n"
         False -> "#f\r\n"
       }
     }
     Double(value) -> string.append(acc, "," <> float.to_string(value) <> "\r\n")
-    BigNumber(value) -> string.append(acc, "(" <> int.to_string(value) <> "\r\n")
-    BulkError(Some(value)) -> string.append(acc, "!" <> int.to_string(string.length(value)) <> "\r\n" <> value <> "\r\n")
+    BigNumber(value) ->
+      string.append(acc, "(" <> int.to_string(value) <> "\r\n")
+    BulkError(Some(value)) ->
+      string.append(
+        acc,
+        "!" <> int.to_string(string.length(value)) <> "\r\n" <> value <> "\r\n",
+      )
     BulkError(None) -> string.append(acc, "!-1\r\n")
-    VerbatimString(Some(value)) ->  string.append(acc, "=" <> int.to_string(string.length(value)) <> "\r\n" <> value <> "\r\n")
+    VerbatimString(Some(value)) ->
+      string.append(
+        acc,
+        "=" <> int.to_string(string.length(value)) <> "\r\n" <> value <> "\r\n",
+      )
     VerbatimString(None) -> string.append(acc, "=-1\r\n")
     Map(Some(map)) -> {
       let entries = dict.to_list(map)
