@@ -59,7 +59,7 @@ pub fn handle_info(
         glisten.send(
           conn,
           bytes_builder.from_string(
-            parser.encode(BulkString(Some("# Replication\r\nrole:master"))),
+            parser.encode(BulkString(Some("# Replication\\r\\nrole:master"))),
           ),
         )
       actor.continue(state)

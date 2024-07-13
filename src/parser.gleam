@@ -501,7 +501,7 @@ fn encode_acc(value: RedisValue, acc: String) -> String {
     BulkString(Some(value)) ->
       string.append(
         acc,
-        "$" <> int.to_string(string.length(value)) <> "\r\n" <> value <> "\r\n",
+        "$" <> int.to_string(string.byte_size(value)) <> "\r\n" <> value <> "\r\n",
       )
     BulkString(None) -> string.append(acc, "$-1\r\n")
     Integer(value) -> string.append(acc, ":" <> int.to_string(value) <> "\r\n")
@@ -530,13 +530,13 @@ fn encode_acc(value: RedisValue, acc: String) -> String {
     BulkError(Some(value)) ->
       string.append(
         acc,
-        "!" <> int.to_string(string.length(value)) <> "\r\n" <> value <> "\r\n",
+        "!" <> int.to_string(string.byte_size(value)) <> "\r\n" <> value <> "\r\n",
       )
     BulkError(None) -> string.append(acc, "!-1\r\n")
     VerbatimString(Some(value)) ->
       string.append(
         acc,
-        "=" <> int.to_string(string.length(value)) <> "\r\n" <> value <> "\r\n",
+        "=" <> int.to_string(string.byte_size(value)) <> "\r\n" <> value <> "\r\n",
       )
     VerbatimString(None) -> string.append(acc, "=-1\r\n")
     Map(Some(map)) -> {
