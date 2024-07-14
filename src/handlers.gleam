@@ -1,5 +1,6 @@
 import birl
 import cache.{type Cache}
+import configuration.{type Config}
 import gleam/bytes_builder
 import gleam/int
 import gleam/option.{None, Some}
@@ -52,6 +53,7 @@ pub fn handle_info(
   conn: glisten.Connection(a),
   state: Nil,
   args: List(RedisValue),
+  config: Config
 ) {
   case args {
     [] -> {
@@ -67,11 +69,15 @@ pub fn handle_info(
     [BulkString(Some(value))] -> {
       case string.lowercase(value) {
         "replication" -> {
+          let role  case config.master {
+            True -> "master"
+            False -> "slave"
+          }
           let assert Ok(_) =
             glisten.send(
               conn,
               bytes_builder.from_string(
-                parser.encode(BulkString(Some("# Replication\r\nrole:master"))),
+                parser.encode(BulkString(Some("# Replication\r\nrole:" <> role))),
               ),
             )
           actor.continue(state)
@@ -128,7 +134,6 @@ pub fn handle_get(
   }
 }
 
-// "*2\r\n\$4\r\ninfo\r\n\$11\r\nreplication\r\n"
 
 pub fn handle_set(
   conn: glisten.Connection(a),

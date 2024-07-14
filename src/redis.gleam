@@ -19,6 +19,7 @@ fn init_store() -> Cache {
 
 pub fn main() {
   let config = configuration.load_configuration()
+  io.debug(config)
 
   let store = init_store()
 
@@ -30,6 +31,7 @@ pub fn main() {
         "ping" -> handlers.handle_ping(conn, state)
         _ -> {
           let redisvalue = parser.decode(message)
+          io.debug(redisvalue)
           case redisvalue {
             Array(Some(list)) -> {
               case list.reverse(list) {
@@ -37,7 +39,7 @@ pub fn main() {
                   case string.lowercase(command) {
                     "ping" -> handlers.handle_ping(conn, state)
                     "echo" -> handlers.handle_echo(conn, state, args)
-                    "info" -> handlers.handle_info(conn, state, args)
+                    "info" -> handlers.handle_info(conn, state, args, configuration)
                     "set" -> handlers.handle_set(conn, state, args, store)
                     "get" -> handlers.handle_get(conn, state, args, store)
                     _ ->
@@ -58,7 +60,7 @@ pub fn main() {
               handlers.handle_simple_error(
                 conn,
                 state,
-                "commands must be encoded as an array with first item a bulk string",
+                "unknown command",
               )
           }
         }
