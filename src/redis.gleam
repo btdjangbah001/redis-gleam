@@ -39,7 +39,7 @@ pub fn main() {
                   case string.lowercase(command) {
                     "ping" -> handlers.handle_ping(conn, state)
                     "echo" -> handlers.handle_echo(conn, state, args)
-                    "info" -> handlers.handle_info(conn, state, args, configuration)
+                    "info" -> handlers.handle_info(conn, state, args, config)
                     "set" -> handlers.handle_set(conn, state, args, store)
                     "get" -> handlers.handle_get(conn, state, args, store)
                     _ ->
