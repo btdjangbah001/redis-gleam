@@ -69,7 +69,7 @@ pub fn handle_info(
     [BulkString(Some(value))] -> {
       case string.lowercase(value) {
         "replication" -> {
-          let role  case config.master {
+          let role = case config.master {
             True -> "master"
             False -> "slave"
           }
