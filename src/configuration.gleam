@@ -37,6 +37,7 @@ pub fn begin_hanshake(replica_deets: ReplicaDeets, port: Int) -> Nil {
   let assert Ok(_) = send_ping(socket)
   let assert Ok(_) = send_first_replconf(socket, port)
   let assert Ok(_) = send_second_replconf(socket)
+  let assert Ok(_) = send_psync(socket)
   Nil
 }
 
@@ -52,6 +53,11 @@ fn send_first_replconf(socket: mug.Socket, port: Int){
 
 fn send_second_replconf(socket: mug.Socket){
   let assert Ok(Nil) = mug.send(socket, bit_array.from_string(parser.encode(parser.Array(Some([parser.BulkString(Some("REPLCONF")), parser.BulkString(Some("capa")), parser.BulkString(Some("psync2"))])))))
+  mug.receive(socket, timeout_milliseconds: 100)
+}
+
+fn send_ping(socket: mug.Socket){
+  let assert Ok(Nil) = mug.send(socket, bit_array.from_string(parser.encode(parser.Array(Some([parser.BulkString(Some("PSYNC")), parser.BulkString(Some("-1")), parser.BulkString(None)])))))
   mug.receive(socket, timeout_milliseconds: 100)
 }
 

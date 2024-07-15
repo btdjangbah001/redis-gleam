@@ -237,6 +237,25 @@ pub fn handle_replconf(
   }
 }
 
+pub fn handle_psync(
+  conn: glisten.Connection(a),
+  state: Nil,
+  args: List(RedisValue),
+) {
+  case args {
+    [BulkString(Some(repl_id)), BulkString(Some(repl_offset)))] -> {
+      let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(SimpleString("FULLRESYNC " <> repl_id <> " 0"))))
+      actor.continue(state)
+    }
+    _ ->
+      handle_simple_error(
+        conn,
+        state,
+        "incorrect arguments for 'psync' command",
+      )
+  }
+}
+
 
 pub fn handle_simple_error(
   conn: glisten.Connection(a),
