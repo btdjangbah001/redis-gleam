@@ -250,7 +250,10 @@ pub fn handle_psync(
       let empty_file_base64 = bit_array.base64_decode("UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==")
       
       let assert Ok(_) = case empty_file_base64 {
-        Ok(empty) -> glisten.send(conn, bytes_builder.from_bit_array(empty))
+        Ok(empty) -> {
+          let begin_encoding = bit_array.from_string("$" <> int.to_string(bit_array.byte_size(empty)) <> "\r\n")
+          glisten.send(conn, bytes_builder.from_bit_array(bit_array.append(begin_encoding, empty)))
+        }
         Error(_) -> panic as {"could not decode empty rdb file as base64"}
       }
 
