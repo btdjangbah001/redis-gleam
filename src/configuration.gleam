@@ -56,7 +56,7 @@ fn send_second_replconf(socket: mug.Socket){
   mug.receive(socket, timeout_milliseconds: 100)
 }
 
-fn send_ping(socket: mug.Socket){
+fn send_psync(socket: mug.Socket){
   let assert Ok(Nil) = mug.send(socket, bit_array.from_string(parser.encode(parser.Array(Some([parser.BulkString(Some("PSYNC")), parser.BulkString(Some("-1")), parser.BulkString(None)])))))
   mug.receive(socket, timeout_milliseconds: 100)
 }

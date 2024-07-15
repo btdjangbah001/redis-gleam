@@ -243,7 +243,7 @@ pub fn handle_psync(
   args: List(RedisValue),
 ) {
   case args {
-    [BulkString(Some(repl_id)), BulkString(Some(repl_offset))] -> {
+    [BulkString(Some(repl_id)), BulkString(Some(_repl_offset))] -> {
       let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(SimpleString("FULLRESYNC " <> repl_id <> " 0"))))
       actor.continue(state)
     }
