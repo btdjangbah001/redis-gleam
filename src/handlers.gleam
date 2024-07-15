@@ -73,11 +73,15 @@ pub fn handle_info(
             True -> "master"
             False -> "slave"
           }
+          let master_repl = case config.master {
+            True -> "\r\nmaster_replid:" <> config.replication_id <> "\r\nmaster_repl_offset:" <> int.to_string(config.replication_offset)
+            False -> ""
+          }
           let assert Ok(_) =
             glisten.send(
               conn,
               bytes_builder.from_string(
-                parser.encode(BulkString(Some("# Replication\r\nrole:" <> role))),
+                parser.encode(BulkString(Some("# Replication\r\nrole:" <> role <> master_repl))),
               ),
             )
           actor.continue(state)

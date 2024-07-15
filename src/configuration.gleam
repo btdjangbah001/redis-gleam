@@ -4,15 +4,20 @@ import gleam/option.{type Option, None, Some}
 import gleam/list
 
 pub type Config {
-  Config(port: Int, master: Bool, replicaof: Option(String))
+  Config(port: Int, master: Bool, replicaof: Option(String), replication_id: String, replication_offset: Int)
 }
 
 pub fn load_configuration() -> Config {
   let args = list.sized_chunk(argv.load().arguments, 2)
 
-  let config = Config(port: 6379, master: True, replicaof: None)
+  let config = Config(port: 6379, master: True, replicaof: None, replication_id: "", replication_offset: 0)
 
-  build_config(args, config)
+  let config = build_config(args, config)
+
+  case config.master {
+    True -> Config(..config, replication_id: generate_replication_id(), replication_offset: 0)
+    False -> config
+  } 
 }
 
 fn build_config(args, acc: Config) {
@@ -43,4 +48,8 @@ fn build_config(args, acc: Config) {
       }
     }
   }
+}
+
+fn generate_replication_id() -> String {
+  "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
 }
