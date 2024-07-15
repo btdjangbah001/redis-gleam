@@ -19,6 +19,10 @@ fn init_store() -> Cache {
 
 pub fn main() {
   let config = configuration.load_configuration()
+  case config.replicaof {
+    Some(replica_deets) -> configuration.begin_hanshake(replica_deets)
+    None -> Nil
+  }
   io.debug(config)
 
   let store = init_store()
