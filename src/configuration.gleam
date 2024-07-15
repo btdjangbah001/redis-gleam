@@ -34,12 +34,25 @@ pub fn begin_hanshake(replica_deets: ReplicaDeets) -> Nil {
     |> mug.timeout(milliseconds: 30000)
     |> mug.connect()
 
-   // Send a packet to the server
-  let assert Ok(Nil) = mug.send(socket, bit_array.from_string(parser.encode(parser.Array(Some([parser.BulkString(Some("PING"))])))))
-
-  // Receive a packet back
-  let assert Ok(_) = mug.receive(socket, timeout_milliseconds: 100)
+  let assert Ok(_) = send_ping(socket)
+  let assert Ok(_) = send_first_replconf(socket, replica_deets.master_port)
+  let assert Ok(_) = send_second_replconf(socket)
   Nil
+}
+
+fn send_ping(socket: mug.Socket){
+  let assert Ok(Nil) = mug.send(socket, bit_array.from_string(parser.encode(parser.Array(Some([parser.BulkString(Some("PING"))])))))
+  mug.receive(socket, timeout_milliseconds: 100)
+}
+
+fn send_first_replconf(socket: mug.Socket, port: Int){
+  let assert Ok(Nil) = mug.send(socket, bit_array.from_string(parser.encode(parser.Array(Some([parser.BulkString(Some("nREPLCONF")), parser.BulkString(Some("listening-port")), parser.BulkString(Some(int.to_string(port)))])))))
+  mug.receive(socket, timeout_milliseconds: 100)
+}
+
+fn send_second_replconf(socket: mug.Socket){
+  let assert Ok(Nil) = mug.send(socket, bit_array.from_string(parser.encode(parser.Array(Some([parser.BulkString(Some("nREPLCONF")), parser.BulkString(Some("capa")), parser.BulkString(Some("psync2"))])))))
+  mug.receive(socket, timeout_milliseconds: 100)
 }
 
 fn build_config(args, acc: Config) {

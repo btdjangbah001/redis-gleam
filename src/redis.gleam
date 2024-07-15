@@ -46,6 +46,7 @@ pub fn main() {
                     "info" -> handlers.handle_info(conn, state, args, config)
                     "set" -> handlers.handle_set(conn, state, args, store)
                     "get" -> handlers.handle_get(conn, state, args, store)
+                    "replconf" -> handlers.handle_replconf(conn, state, args)
                     _ ->
                       handlers.handle_simple_error(
                         conn,

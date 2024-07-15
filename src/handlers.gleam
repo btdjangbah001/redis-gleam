@@ -214,6 +214,30 @@ pub fn handle_set(
   }
 }
 
+pub fn handle_replconf(
+  conn: glisten.Connection(a),
+  state: Nil,
+  args: List(RedisValue),
+) {
+  case args {
+    [BulkString(Some("listening-port")), BulkString(Some(_port))] -> {
+      let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(SimpleString("OK"))))
+      actor.continue(state)
+    }
+    [BulkString(Some("capa")), BulkString(Some(_capa))] -> {
+      let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(SimpleString("OK"))))
+      actor.continue(state)
+    }
+    _ ->
+      handle_simple_error(
+        conn,
+        state,
+        "incorrect arguments for 'replconf' command",
+      )
+  }
+}
+
+
 pub fn handle_simple_error(
   conn: glisten.Connection(a),
   state: Nil,
