@@ -28,14 +28,14 @@ pub fn load_configuration() -> Config {
   } 
 }
 
-pub fn begin_hanshake(replica_deets: ReplicaDeets) -> Nil {
+pub fn begin_hanshake(replica_deets: ReplicaDeets, port: Int) -> Nil {
   let assert Ok(socket) = 
     mug.new(replica_deets.master_host, port: replica_deets.master_port)
     |> mug.timeout(milliseconds: 30000)
     |> mug.connect()
 
   let assert Ok(_) = send_ping(socket)
-  let assert Ok(_) = send_first_replconf(socket, replica_deets.master_port)
+  let assert Ok(_) = send_first_replconf(socket, port)
   let assert Ok(_) = send_second_replconf(socket)
   Nil
 }
