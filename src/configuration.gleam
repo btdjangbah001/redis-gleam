@@ -57,7 +57,7 @@ fn send_second_replconf(socket: mug.Socket){
 }
 
 fn send_psync(socket: mug.Socket){
-  let assert Ok(Nil) = mug.send(socket, bit_array.from_string(parser.encode(parser.Array(Some([parser.BulkString(Some("PSYNC")), parser.BulkString(Some("-1")), parser.BulkString(None)])))))
+  let assert Ok(Nil) = mug.send(socket, bit_array.from_string(parser.encode(parser.Array(Some([parser.BulkString(Some("PSYNC")), parser.BulkString(Some("?")), parser.BulkString(Some("-1"))])))))
   mug.receive(socket, timeout_milliseconds: 100)
 }
 
