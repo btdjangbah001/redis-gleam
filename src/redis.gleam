@@ -20,7 +20,7 @@ fn init_store() -> Cache {
 pub fn main() {
   let config = configuration.load_configuration()
   case config.replicaof {
-    Some(replica_deets) -> configuration.begin_hanshake(replica_deets, config.port)
+    Some(master_deets) -> configuration.begin_hanshake(master_deets, config.port)
     None -> Nil
   }
   io.debug(config)

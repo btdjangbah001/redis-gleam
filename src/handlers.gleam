@@ -1,4 +1,5 @@
 import birl
+import gleam/bit_array
 import cache.{type Cache}
 import configuration.{type Config}
 import gleam/bytes_builder
@@ -246,6 +247,13 @@ pub fn handle_psync(
   case args {
     [BulkString(Some(_repl_id)), BulkString(Some(_repl_offset))] -> {
       let assert Ok(_) = glisten.send(conn, bytes_builder.from_string(parser.encode(SimpleString("FULLRESYNC " <> config.replication_id <> " 0"))))
+      let empty_file_base64 = bit_array.base64_decode("UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==")
+      
+      let assert Ok(_) = case empty_file_base64 {
+        Ok(empty) -> glisten.send(conn, bytes_builder.from_bit_array(empty))
+        Error(_) -> panic as {"could not decode empty rdb file as base64"}
+      }
+
       actor.continue(state)
     }
     _ ->
