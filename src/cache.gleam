@@ -11,8 +11,9 @@ pub type Store =
 pub type Message {
   Get(Subject(Result(String, Nil)), String)
   Set(String, #(String, Int))
-  Delete(String)
+  Delete(Subject(Result(String, Nil)), String)
 }
+
 
 pub type Cache =
   Subject(Message)
@@ -20,8 +21,8 @@ pub type Cache =
 fn handle_commands(message: Message, store: Store) -> actor.Next(Message, Store) {
   case message {
     Set(key, value) -> {
-      let store = dict.insert(store, key, value)
-      actor.continue(store)
+      dict.insert(store, key, value)
+      |> actor.continue()
     }
     Get(client, key) -> {
       let value = dict.get(store, key)
@@ -53,9 +54,19 @@ fn handle_commands(message: Message, store: Store) -> actor.Next(Message, Store)
         }
       }
     }
-    Delete(key) -> {
-      let store = dict.delete(store, key)
-      actor.continue(store)
+    Delete(client, key) -> {
+      let value = dict.get(store, key)
+      case value {
+        Ok(_) -> {
+          let store = dict.delete(store, key)
+          process.send(client, Ok(":1\r\n"))
+          actor.continue(store)
+        }
+        Error(_) -> {
+          process.send(client, Ok(":0\r\n"))
+          actor.continue(store)
+        }
+      }
     }
   }
 }
@@ -73,6 +84,6 @@ pub fn get(cache: Cache, key: String) -> Result(String, Nil) {
   //process.try_call maybe?
 }
 
-pub fn delete(cache: Cache, key: String) -> Nil {
-  process.send(cache, Delete(key))
+pub fn delete(cache: Cache, key: String) -> Result(String, Nil) {
+  actor.call(cache, Delete(_, key), timeout)
 }
